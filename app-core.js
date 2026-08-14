@@ -103,6 +103,89 @@ const MOCK_GIFTS = Array.from({ length: 48 }).map((_, i) => {
   };
 });
 
+/* ---- donor directory (derived from gift history) ---- */
+const STREETS = ["Maple Ave", "Oak St", "Sunset Blvd", "Cedar Ln", "5th Ave", "Elm St", "River Rd", "Highland Dr", "Park Pl", "Birch Way"];
+const CITIES = [["Portland", "OR", "972"], ["Austin", "TX", "787"], ["Denver", "CO", "802"], ["Raleigh", "NC", "276"], ["Columbus", "OH", "432"], ["Sacramento", "CA", "958"], ["Madison", "WI", "537"], ["Richmond", "VA", "232"]];
+const RECUR_FREQS = ["monthly", "monthly", "monthly", "quarterly", "annual"];
+
+function futureDate(minDays, maxDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + minDays + Math.floor(rand() * (maxDays - minDays)));
+  return d.toISOString().slice(0, 10);
+}
+
+function buildDonors() {
+  const byEmail = new Map();
+  MOCK_GIFTS.forEach((g) => {
+    if (!byEmail.has(g.email)) byEmail.set(g.email, []);
+    byEmail.get(g.email).push(g);
+  });
+
+  let i = 0;
+  const donors = [];
+  for (const [email, gifts] of byEmail.entries()) {
+    i++;
+    const sortedGifts = [...gifts].sort((a, b) => b.date.localeCompare(a.date));
+    const oldestFirst = [...gifts].sort((a, b) => a.date.localeCompare(b.date));
+    const settled = gifts.filter((g) => g.status === "settled");
+    const totalGiving = settled.reduce((a, g) => a + g.amount, 0);
+    const largestGift = gifts.reduce((m, g) => Math.max(m, g.amount), 0);
+    const city = CITIES[Math.floor(rand() * CITIES.length)];
+
+    const recurringSource = gifts.find((g) => g.type === "recurring");
+    const recurringGifts = recurringSource ? [{
+      id: "RG-" + (5000 + i),
+      designation: recurringSource.designation,
+      amount: recurringSource.amount,
+      frequency: RECUR_FREQS[Math.floor(rand() * RECUR_FREQS.length)],
+      status: rand() > 0.15 ? "active" : "paused",
+      startDate: oldestFirst[0].date,
+      nextChargeDate: futureDate(1, 28),
+    }] : [];
+
+    const pledgeGifts = gifts.filter((g) => g.type === "pledge_payment");
+    const pledges = pledgeGifts.length ? (() => {
+      const paid = pledgeGifts.reduce((a, g) => a + g.amount, 0);
+      const totalPledged = paid + (Math.round((paid * (0.5 + rand() * 1.5)) / 50) * 50 || 50);
+      return [{
+        id: "PLG-" + (7000 + i),
+        designation: pledgeGifts[0].designation,
+        totalPledged,
+        totalPaid: paid,
+        balance: totalPledged - paid,
+        installments: pledgeGifts.length,
+        nextDueDate: futureDate(7, 60),
+      }];
+    })() : [];
+
+    const syncedCount = gifts.filter((g) => g.synced).length;
+    const reSynced = syncedCount === gifts.length ? "synced" : syncedCount === 0 ? "pending" : "partial";
+
+    donors.push({
+      id: "DNR-" + (30000 + i),
+      name: gifts[0].donor,
+      email,
+      phone: "(" + (200 + Math.floor(rand() * 700)) + ") " + (200 + Math.floor(rand() * 700)) + "-" + (1000 + Math.floor(rand() * 8999)),
+      address: {
+        line1: (100 + Math.floor(rand() * 8899)) + " " + STREETS[Math.floor(rand() * STREETS.length)],
+        city: city[0], state: city[1], zip: city[2] + Math.floor(10 + rand() * 89),
+      },
+      gifts: sortedGifts,
+      giftCount: gifts.length,
+      totalGiving,
+      largestGift,
+      firstGiftDate: oldestFirst[0].date,
+      lastGiftDate: sortedGifts[0].date,
+      recurringGifts,
+      pledges,
+      reConstituentId: "CNST-" + (100000 + Math.floor(rand() * 899999)),
+      reSynced,
+    });
+  }
+  return donors;
+}
+const MOCK_DONORS = buildDonors();
+
 /* ============================================================
    SHARED CHECKOUT STATE HOOK
    ============================================================ */

@@ -74,7 +74,7 @@ function CheckoutView({ templateId, onBack }) {
 function AdminConsole() {
   const [page, setPage] = useState("gifts");
   const items = [
-    { section: "Overview", items: [["gifts", "Gift history"]] },
+    { section: "Overview", items: [["gifts", "Gift history"], ["donors", "Donors"]] },
     { section: "Forms", items: [["builder", "Form builder"], ["branding", "Branding"]] },
     { section: "Payments", items: [["merchant", "Payment processing"]] },
   ];
@@ -92,6 +92,7 @@ function AdminConsole() {
       </div>
       <div className="ge-admin-content">
         {page === "gifts" && <GiftHistory />}
+        {page === "donors" && <DonorDirectory />}
         {page === "builder" && <FormBuilder />}
         {page === "branding" && <Branding />}
         {page === "merchant" && <MerchantAccountSummary goOnboard={() => setPage("__onb")} />}
