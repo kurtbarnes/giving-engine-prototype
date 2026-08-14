@@ -74,6 +74,7 @@ function CheckoutView({ templateId, onBack }) {
 function AdminConsole() {
   const [page, setPage] = useState("gifts");
   const [editingForm, setEditingForm] = useState(null);
+  const [builderKey, setBuilderKey] = useState(0);
   const items = [
     { section: "Overview", items: [["gifts", "Gift history"], ["donors", "Donors"]] },
     { section: "Forms", items: [["forms", "Forms"]] },
@@ -97,11 +98,11 @@ function AdminConsole() {
         {page === "donors" && <DonorDirectory />}
         {page === "forms" && (
           <FormsList
-            onNew={() => { setEditingForm(null); setPage("__builder"); }}
-            onEdit={(f) => { setEditingForm(f); setPage("__builder"); }}
+            onNew={() => { setEditingForm(null); setBuilderKey((k) => k + 1); setPage("__builder"); }}
+            onEdit={(f) => { setEditingForm(f); setBuilderKey((k) => k + 1); setPage("__builder"); }}
           />
         )}
-        {page === "__builder" && <FormBuilder formName={editingForm ? editingForm.name : "Untitled form"} onBack={() => setPage("forms")} />}
+        {page === "__builder" && <FormBuilder key={builderKey} formName={editingForm ? editingForm.name : "Untitled form"} onBack={() => setPage("forms")} />}
         {page === "branding" && <Branding />}
         {page === "payments" && <MerchantAccountSummary goOnboard={() => setPage("__onb")} />}
         {page === "security" && <SecuritySettings />}

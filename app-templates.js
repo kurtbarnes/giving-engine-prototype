@@ -252,19 +252,20 @@ function StoryPage({ org }) {
 /* ============================================================
    4. MODAL OVERLAY
    ============================================================ */
-function ModalOverlay({ org }) {
+function ModalOverlay({ org, accent = "#6D4AFF" }) {
   const c = useCheckout(org);
   const [open, setOpen] = useState(true);
+  const donateBtnStyle = { background: accent, boxShadow: `0 10px 24px ${accent}59` };
   return (
     <div className="tmpl-modal-host">
       <div className="tmpl-modal-nav">
         <div className="site-logo">{org.name}</div>
-        <button className="tmpl-modal-donate-btn" onClick={() => setOpen(true)}>Donate</button>
+        <button className="tmpl-modal-donate-btn" style={donateBtnStyle} onClick={() => setOpen(true)}>Donate</button>
       </div>
       <div className="tmpl-modal-hero">
         <h1>Music changes lives. So does your gift.</h1>
         <p>The Symphony's education programs reach 14,000 students a year across the region — entirely funded by gifts like yours.</p>
-        <button className="tmpl-modal-donate-btn" onClick={() => setOpen(true)}>Support the Symphony</button>
+        <button className="tmpl-modal-donate-btn" style={donateBtnStyle} onClick={() => setOpen(true)}>Support the Symphony</button>
       </div>
       {open && (
         <div className="tmpl-modal-overlay" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
@@ -286,6 +287,7 @@ function ModalOverlay({ org }) {
                   <div className="amount-grid">
                     {org.amounts.map((a) => (
                       <button key={a} className={"amount-btn" + (!c.customAmount && c.amount === a ? " on" : "")}
+                        style={!c.customAmount && c.amount === a ? { borderColor: accent, background: accent } : undefined}
                         onClick={() => { c.setAmount(a); c.setCustomAmount(""); }}>{fmtMoney(a)}</button>
                     ))}
                   </div>
@@ -294,7 +296,7 @@ function ModalOverlay({ org }) {
                   <select value={c.designationId} onChange={(e) => c.setDesignationId(e.target.value)}>
                     {org.designations.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
-                  <button className="submit-btn" onClick={c.goNext}>Continue</button>
+                  <button className="submit-btn" style={donateBtnStyle} onClick={c.goNext}>Continue</button>
                 </React.Fragment>
               )}
               {c.step === 2 && (
@@ -304,13 +306,13 @@ function ModalOverlay({ org }) {
                   <input type="text" placeholder="First name" value={c.firstName} onChange={(e) => c.setFirstName(e.target.value)} />
                   <input type="text" placeholder="Last name" value={c.lastName} onChange={(e) => c.setLastName(e.target.value)} />
                   <input type="text" placeholder="Card number" defaultValue="4242 4242 4242 4242" />
-                  <button className="submit-btn" onClick={c.submit} disabled={c.submitting}>
+                  <button className="submit-btn" style={donateBtnStyle} onClick={c.submit} disabled={c.submitting}>
                     {c.submitting ? "Processing\u2026" : `Give ${fmtMoney(c.chosenAmount)} now`}
                   </button>
                   <div style={{ textAlign: "center", marginTop: 10, fontSize: 12.5, color: "#6A6086", cursor: "pointer" }} onClick={c.goBack}>&larr; Back</div>
                 </React.Fragment>
               )}
-              {c.step === 3 && <ConfirmPanel checkout={c} org={org} accent="#6D4AFF" />}
+              {c.step === 3 && <ConfirmPanel checkout={c} org={org} accent={accent} />}
             </div>
           </div>
         </div>

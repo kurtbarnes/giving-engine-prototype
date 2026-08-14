@@ -457,15 +457,120 @@ function FieldRow({ label, desc, children }) {
   );
 }
 
-function FormBuilder({ formName = "Spring Appeal", onBack }) {
+const FORM_TYPES = [
+  { id: "story", name: "Full page + form", tag: "Story mode", desc: "A narrative landing page with hero image, goal meter, and a docked giving card — donors never leave your story." },
+  { id: "standalone", name: "Standalone / embeddable form", tag: "Page or embed", desc: "A self-contained donation form you can embed inline on any page, or host at its own URL." },
+  { id: "modal", name: "Modal embedded form", tag: "Popup overlay", desc: "A “Donate” button on your existing site opens this form in a zero-redirect overlay." },
+];
+
+const FORM_DESIGNS = [
+  { id: "classic", name: "Classic NXT", brand: "#1B4B8F", desc: "A close visual match to today's Raiser's Edge NXT donation form — familiar for migrating organizations." },
+  { id: "zeffy", name: "Zeffy-inspired", brand: "#FF6B4A", desc: "Short, mobile-first, generous white space, minimal fields visible at once." },
+  { id: "fundraiseup", name: "FundraiseUp-inspired", brand: "#6D4AFF", desc: "Bold, conversion-optimized styling built for a zero-redirect overlay experience." },
+];
+
+const STORY_LAYOUTS = [
+  { id: "hero-left", name: "Hero left, sticky give card", grad: "linear-gradient(135deg,#2F5D50,#12241F)", desc: "Large hero image and headline on the left; the giving card docks to the right and follows as visitors scroll." },
+  { id: "hero-center", name: "Centered hero", grad: "linear-gradient(135deg,#1D3F35,#3E6E5C)", desc: "Full-width centered headline and hero image above the fold, with the giving card just below." },
+  { id: "minimal-narrative", name: "Minimal narrative", grad: "linear-gradient(135deg,#4A6E60,#1D3F35)", desc: "Text-forward storytelling with a smaller hero image and the giving card inline at the end of the story." },
+];
+
+const WIZARD_STEP_LABELS = {
+  type: "Type", design: "Design", story_layout: "Layout", story_content: "Story",
+  gift_types: "Gift types", designations: "Designations", donor_fields: "Donor fields",
+  custom_fields: "Custom fields", fee: "Fee coverage", distribution: "Distribution", review: "Review",
+};
+
+function wizardSteps(type) {
+  if (type === "story") return ["type", "story_layout", "story_content", "gift_types", "designations", "donor_fields", "custom_fields", "fee", "review"];
+  if (type) return ["type", "design", "gift_types", "designations", "donor_fields", "custom_fields", "fee", "distribution", "review"];
+  return ["type"];
+}
+
+function resolvePreview(type, design) {
+  if (type === "story") return { templateId: "story", accent: null };
+  if (type === "modal") return { templateId: "modal", accent: (FORM_DESIGNS.find((d) => d.id === design) || FORM_DESIGNS[2]).brand };
+  if (design === "classic") return { templateId: "classic", accent: null };
+  if (design === "zeffy") return { templateId: "minimal", accent: null };
+  return { templateId: "modal", accent: FORM_DESIGNS[2].brand };
+}
+
+function OptionCards({ options, value, onChange, columns = 1 }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 12 }}>
+      {options.map((o) => (
+        <div key={o.id} onClick={() => onChange(o.id)}
+          style={{ border: "2px solid " + (value === o.id ? "#14213D" : "#E4E7EC"), borderRadius: 12, padding: 16, cursor: "pointer", background: value === o.id ? "#FAFBFF" : "#fff" }}>
+          {o.grad && <div style={{ height: 64, borderRadius: 8, background: o.grad, marginBottom: 12 }} />}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
+            <div style={{ fontWeight: 700, fontSize: 14.5 }}>{o.name}</div>
+            {o.tag && <span className="ge-tag" style={{ flexShrink: 0 }}>{o.tag}</span>}
+          </div>
+          <div style={{ fontSize: 12.5, color: "#667085", lineHeight: 1.5 }}>{o.desc}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FormBuilder({ formName = "Untitled form", onBack }) {
+  const [stepIndex, setStepIndex] = useState(0);
+  const [maxReached, setMaxReached] = useState(0);
+  const [published, setPublished] = useState(false);
+
+  const [type, setType] = useState(null);
+  const [design, setDesign] = useState(null);
+  const [storyLayout, setStoryLayout] = useState("hero-left");
+  const [storyHeadline, setStoryHeadline] = useState("2,400 acres of shoreline are one signature away from being saved.");
+  const [goalEnabled, setGoalEnabled] = useState(true);
+  const [goalTarget, setGoalTarget] = useState("250000");
+  const [ctaText, setCtaText] = useState("Give now");
+
   const [gt, setGt] = useState({ one_time: true, recurring: true, pledge: true, org_gift: true });
   const [fields, setFields] = useState({ title: true, address: "optional", phone: false, anonymous: true, tribute: true, comments: true, consent: true, ackOptOut: true });
   const [otherFund, setOtherFund] = useState(true);
+  const [splitEnabled, setSplitEnabled] = useState(false);
+  const [customFieldIds, setCustomFieldIds] = useState([]);
   const [feeCoverDefault, setFeeCoverDefault] = useState(false);
   const [feeCopy, setFeeCopy] = useState("Add a little extra so 100% of my gift reaches you.");
-  const [template, setTemplate] = useState("classic");
   const [dist, setDist] = useState("both");
   const [slug, setSlug] = useState("spring-appeal");
+
+  const steps = useMemo(() => wizardSteps(type), [type]);
+  const stepKey = steps[stepIndex] || "type";
+  const allCustomFields = useMemo(() => [
+    ...MOCK_DONOR_FIELDS.map((f) => ({ ...f, group: "Donor" })),
+    ...MOCK_GIFT_FIELDS.map((f) => ({ ...f, group: "Gift" })),
+  ], []);
+
+  function goStepIndex(idx) {
+    if (idx >= 0 && idx < steps.length && idx <= maxReached) setStepIndex(idx);
+  }
+  function goToStep(key) { goStepIndex(steps.indexOf(key)); }
+  function next() {
+    if ((stepKey === "type" && !type) || (stepKey === "design" && !design)) return;
+    const nextIdx = Math.min(steps.length - 1, stepIndex + 1);
+    setStepIndex(nextIdx);
+    setMaxReached((m) => Math.max(m, nextIdx));
+  }
+  function back() { setStepIndex((s) => Math.max(0, s - 1)); }
+  function toggleCustomField(id) {
+    setCustomFieldIds((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]));
+  }
+
+  const { templateId, accent } = type ? resolvePreview(type, design) : { templateId: null, accent: null };
+  const enabledFieldCount = Object.values(fields).filter((v) => v === true).length;
+
+  if (published) {
+    return (
+      <div className="ge-confirm-wrap" style={{ maxWidth: 460, margin: "60px auto" }}>
+        <div className="ge-confirm-check">&#10003;</div>
+        <h2>{formName === "Untitled form" ? "Your form is live" : `${formName} is live`}</h2>
+        <p>This form is now accepting gifts using the configuration you just set up. You can come back and edit it any time from the Forms list.</p>
+        <button className="ge-btn ge-btn-primary" onClick={onBack}>Back to Forms</button>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -473,93 +578,219 @@ function FormBuilder({ formName = "Spring Appeal", onBack }) {
       <div className="ge-page-head">
         <div className="ge-eyebrow">Admin Console</div>
         <h1>Form builder — {formName}</h1>
-        <p>Configure gift types, fields, and distribution for this form. Every field below maps directly to the Form entity in the design document (§6, §9).</p>
+        <p>Configure this form step by step — type, design, gift options, and fields — then review everything before publishing.</p>
       </div>
+
+      <div className="ge-onb-steps" style={{ marginBottom: 26, flexWrap: "wrap", rowGap: 14 }}>
+        {steps.map((key, i) => (
+          <React.Fragment key={key}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: i <= maxReached ? "pointer" : "default" }} onClick={() => goStepIndex(i)}>
+              <div className={"ge-onb-step-dot " + (i < stepIndex ? "done" : i === stepIndex ? "current" : "")}>{i < stepIndex ? "✓" : i + 1}</div>
+              <div style={{ fontSize: 10.5, color: "#98A2B3", fontWeight: 600, whiteSpace: "nowrap" }}>{WIZARD_STEP_LABELS[key]}</div>
+            </div>
+            {i < steps.length - 1 && <div className={"ge-onb-step-line " + (i < stepIndex ? "done" : "")} style={{ minWidth: 16 }} />}
+          </React.Fragment>
+        ))}
+      </div>
+
       <div className="ge-formbuilder-grid">
         <div>
           <div className="ge-card ge-card-pad ge-field-group">
-            <h3>Gift types</h3>
-            <FieldRow label="One-time gifts"><Toggle on={gt.one_time} onClick={() => setGt((s) => ({ ...s, one_time: !s.one_time }))} /></FieldRow>
-            <FieldRow label="Recurring gifts"><Toggle on={gt.recurring} onClick={() => setGt((s) => ({ ...s, recurring: !s.recurring }))} /></FieldRow>
-            <FieldRow label="Pledge payments" desc="Donor looks up an existing RE NXT pledge and pays it down"><Toggle on={gt.pledge} onClick={() => setGt((s) => ({ ...s, pledge: !s.pledge }))} /></FieldRow>
-            <FieldRow label="Organization / business gifts"><Toggle on={gt.org_gift} onClick={() => setGt((s) => ({ ...s, org_gift: !s.org_gift }))} /></FieldRow>
-          </div>
-
-          <div className="ge-card ge-card-pad ge-field-group">
-            <h3>Designations</h3>
-            <FieldRow label="Allow “Other” write-in fund" desc="Reveals a required free-text field only when selected"><Toggle on={otherFund} onClick={() => setOtherFund((v) => !v)} /></FieldRow>
-            <FieldRow label="Allow donors to split gifts across designations"><Toggle on={true} onClick={() => {}} /></FieldRow>
-          </div>
-
-          <div className="ge-card ge-card-pad ge-field-group">
-            <h3>Donor fields</h3>
-            <FieldRow label="Title (Mr./Mrs./Mx.)"><Toggle on={fields.title} onClick={() => setFields((s) => ({ ...s, title: !s.title }))} /></FieldRow>
-            <FieldRow label="Address">
-              <div className="ge-radiogroup">
-                {["required", "optional", "off"].map((v) => (
-                  <button key={v} className={fields.address === v ? "on" : ""} onClick={() => setFields((s) => ({ ...s, address: v }))}>{v[0].toUpperCase() + v.slice(1)}</button>
-                ))}
-              </div>
-            </FieldRow>
-            <FieldRow label="Phone number"><Toggle on={fields.phone} onClick={() => setFields((s) => ({ ...s, phone: !s.phone }))} /></FieldRow>
-            <FieldRow label="Anonymous gift option"><Toggle on={fields.anonymous} onClick={() => setFields((s) => ({ ...s, anonymous: !s.anonymous }))} /></FieldRow>
-            <FieldRow label="Tribute (honor / memorial)" desc="Structured first + last honoree name"><Toggle on={fields.tribute} onClick={() => setFields((s) => ({ ...s, tribute: !s.tribute }))} /></FieldRow>
-            <FieldRow label="Comments" desc="1,000 character limit (org default)"><Toggle on={fields.comments} onClick={() => setFields((s) => ({ ...s, comments: !s.comments }))} /></FieldRow>
-            <FieldRow label="Communication consent checkboxes"><Toggle on={fields.consent} onClick={() => setFields((s) => ({ ...s, consent: !s.consent }))} /></FieldRow>
-            <FieldRow label="Let donor opt out of mailed acknowledgement"><Toggle on={fields.ackOptOut} onClick={() => setFields((s) => ({ ...s, ackOptOut: !s.ackOptOut }))} /></FieldRow>
-          </div>
-
-          <div className="ge-card ge-card-pad ge-field-group">
-            <h3>Fee coverage (Donor Cover)</h3>
-            <FieldRow label="Pre-check fee coverage by default" desc="Product default is unchecked (opt-in) per idea RENXT-I-5533"><Toggle on={feeCoverDefault} onClick={() => setFeeCoverDefault((v) => !v)} /></FieldRow>
-            <div style={{ marginTop: 10 }}>
-              <label className="ge-label">Disclosure copy</label>
-              <input className="ge-input" value={feeCopy} onChange={(e) => setFeeCopy(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="ge-card ge-card-pad ge-field-group">
-            <h3>Distribution</h3>
-            <FieldRow label="Where this form appears">
-              <div className="ge-radiogroup">
-                {[["embed", "Embedded only"], ["hosted", "Hosted page only"], ["both", "Both"]].map(([v, l]) => (
-                  <button key={v} className={dist === v ? "on" : ""} onClick={() => setDist(v)}>{l}</button>
-                ))}
-              </div>
-            </FieldRow>
-            {dist !== "embed" && (
-              <div style={{ marginTop: 12 }}>
-                <label className="ge-label">Hosted page URL</label>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 13.5, color: "#98A2B3" }}>give.riverbendhumane.org/</span>
-                  <input className="ge-input" style={{ width: 160 }} value={slug} onChange={(e) => setSlug(e.target.value)} />
-                </div>
-              </div>
+            {stepKey === "type" && (
+              <React.Fragment>
+                <h3>What type of form is this?</h3>
+                <OptionCards options={FORM_TYPES} value={type} onChange={setType} />
+              </React.Fragment>
             )}
+
+            {stepKey === "design" && (
+              <React.Fragment>
+                <h3>Choose a design</h3>
+                <OptionCards options={FORM_DESIGNS} value={design} onChange={setDesign} columns={3} />
+              </React.Fragment>
+            )}
+
+            {stepKey === "story_layout" && (
+              <React.Fragment>
+                <h3>Choose a story layout</h3>
+                <OptionCards options={STORY_LAYOUTS} value={storyLayout} onChange={setStoryLayout} columns={3} />
+              </React.Fragment>
+            )}
+
+            {stepKey === "story_content" && (
+              <React.Fragment>
+                <h3>Tell your story</h3>
+                <div style={{ marginBottom: 14 }}>
+                  <label className="ge-label">Headline</label>
+                  <input className="ge-input" value={storyHeadline} onChange={(e) => setStoryHeadline(e.target.value)} />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label className="ge-label">Hero image</label>
+                  <div className="ge-doc-drop">Drag an image here, or click to upload</div>
+                </div>
+                <FieldRow label="Show fundraising goal meter"><Toggle on={goalEnabled} onClick={() => setGoalEnabled((v) => !v)} /></FieldRow>
+                {goalEnabled && (
+                  <div style={{ marginTop: 10, marginBottom: 4 }}>
+                    <label className="ge-label">Goal amount</label>
+                    <input className="ge-input" value={goalTarget} onChange={(e) => setGoalTarget(e.target.value.replace(/[^0-9]/g, ""))} />
+                  </div>
+                )}
+                <div style={{ marginTop: 14 }}>
+                  <label className="ge-label">Give button text</label>
+                  <input className="ge-input" value={ctaText} onChange={(e) => setCtaText(e.target.value)} />
+                </div>
+                <div style={{ marginTop: 14 }}>
+                  <label className="ge-label">Hosted page URL</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <span style={{ fontSize: 13.5, color: "#98A2B3" }}>give.riverbendhumane.org/</span>
+                    <input className="ge-input" style={{ width: 160 }} value={slug} onChange={(e) => setSlug(e.target.value)} />
+                  </div>
+                </div>
+              </React.Fragment>
+            )}
+
+            {stepKey === "gift_types" && (
+              <React.Fragment>
+                <h3>Gift types</h3>
+                <FieldRow label="One-time gifts"><Toggle on={gt.one_time} onClick={() => setGt((s) => ({ ...s, one_time: !s.one_time }))} /></FieldRow>
+                <FieldRow label="Recurring gifts"><Toggle on={gt.recurring} onClick={() => setGt((s) => ({ ...s, recurring: !s.recurring }))} /></FieldRow>
+                <FieldRow label="Pledge payments" desc="Donor looks up an existing RE NXT pledge and pays it down"><Toggle on={gt.pledge} onClick={() => setGt((s) => ({ ...s, pledge: !s.pledge }))} /></FieldRow>
+                <FieldRow label="Organization / business gifts"><Toggle on={gt.org_gift} onClick={() => setGt((s) => ({ ...s, org_gift: !s.org_gift }))} /></FieldRow>
+              </React.Fragment>
+            )}
+
+            {stepKey === "designations" && (
+              <React.Fragment>
+                <h3>Designations</h3>
+                <FieldRow label="Allow “Other” write-in fund" desc="Reveals a required free-text field only when selected"><Toggle on={otherFund} onClick={() => setOtherFund((v) => !v)} /></FieldRow>
+                <FieldRow label="Allow donors to split gifts across designations" desc="Available on every form type and design"><Toggle on={splitEnabled} onClick={() => setSplitEnabled((v) => !v)} /></FieldRow>
+              </React.Fragment>
+            )}
+
+            {stepKey === "donor_fields" && (
+              <React.Fragment>
+                <h3>Donor fields</h3>
+                <FieldRow label="Title (Mr./Mrs./Mx.)"><Toggle on={fields.title} onClick={() => setFields((s) => ({ ...s, title: !s.title }))} /></FieldRow>
+                <FieldRow label="Address">
+                  <div className="ge-radiogroup">
+                    {["required", "optional", "off"].map((v) => (
+                      <button key={v} className={fields.address === v ? "on" : ""} onClick={() => setFields((s) => ({ ...s, address: v }))}>{v[0].toUpperCase() + v.slice(1)}</button>
+                    ))}
+                  </div>
+                </FieldRow>
+                <FieldRow label="Phone number"><Toggle on={fields.phone} onClick={() => setFields((s) => ({ ...s, phone: !s.phone }))} /></FieldRow>
+                <FieldRow label="Anonymous gift option"><Toggle on={fields.anonymous} onClick={() => setFields((s) => ({ ...s, anonymous: !s.anonymous }))} /></FieldRow>
+                <FieldRow label="Tribute (honor / memorial)" desc="Structured first + last honoree name"><Toggle on={fields.tribute} onClick={() => setFields((s) => ({ ...s, tribute: !s.tribute }))} /></FieldRow>
+                <FieldRow label="Comments" desc="1,000 character limit (org default)"><Toggle on={fields.comments} onClick={() => setFields((s) => ({ ...s, comments: !s.comments }))} /></FieldRow>
+                <FieldRow label="Communication consent checkboxes"><Toggle on={fields.consent} onClick={() => setFields((s) => ({ ...s, consent: !s.consent }))} /></FieldRow>
+                <FieldRow label="Let donor opt out of mailed acknowledgement"><Toggle on={fields.ackOptOut} onClick={() => setFields((s) => ({ ...s, ackOptOut: !s.ackOptOut }))} /></FieldRow>
+              </React.Fragment>
+            )}
+
+            {stepKey === "custom_fields" && (
+              <React.Fragment>
+                <h3>Custom fields</h3>
+                <p style={{ fontSize: 12.5, color: "#98A2B3", margin: "0 0 14px" }}>Optional. These are configured in Settings → General — turn any of them on to include as a field on this form.</p>
+                {["Donor", "Gift"].map((group) => (
+                  <div key={group} style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".04em", color: "#98A2B3", marginBottom: 6 }}>{group} fields</div>
+                    {allCustomFields.filter((f) => f.group === group).map((f) => (
+                      <FieldRow key={f.id} label={f.name} desc={f.type}>
+                        <Toggle on={customFieldIds.includes(f.id)} onClick={() => toggleCustomField(f.id)} />
+                      </FieldRow>
+                    ))}
+                  </div>
+                ))}
+              </React.Fragment>
+            )}
+
+            {stepKey === "fee" && (
+              <React.Fragment>
+                <h3>Fee coverage (Donor Cover)</h3>
+                <FieldRow label="Pre-check fee coverage by default" desc="Product default is unchecked (opt-in) per idea RENXT-I-5533"><Toggle on={feeCoverDefault} onClick={() => setFeeCoverDefault((v) => !v)} /></FieldRow>
+                <div style={{ marginTop: 10 }}>
+                  <label className="ge-label">Disclosure copy</label>
+                  <input className="ge-input" value={feeCopy} onChange={(e) => setFeeCopy(e.target.value)} />
+                </div>
+              </React.Fragment>
+            )}
+
+            {stepKey === "distribution" && (
+              <React.Fragment>
+                <h3>Distribution</h3>
+                <FieldRow label="Where this form appears">
+                  <div className="ge-radiogroup">
+                    {[["embed", "Embedded only"], ["hosted", "Hosted page only"], ["both", "Both"]].map(([v, l]) => (
+                      <button key={v} className={dist === v ? "on" : ""} onClick={() => setDist(v)}>{l}</button>
+                    ))}
+                  </div>
+                </FieldRow>
+                {dist !== "embed" && (
+                  <div style={{ marginTop: 12 }}>
+                    <label className="ge-label">Hosted page URL</label>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13.5, color: "#98A2B3" }}>give.riverbendhumane.org/</span>
+                      <input className="ge-input" style={{ width: 160 }} value={slug} onChange={(e) => setSlug(e.target.value)} />
+                    </div>
+                  </div>
+                )}
+              </React.Fragment>
+            )}
+
+            {stepKey === "review" && (
+              <React.Fragment>
+                <h3>Review &amp; publish</h3>
+                {[
+                  ["Type", (FORM_TYPES.find((t) => t.id === type) || {}).name, "type"],
+                  type === "story"
+                    ? ["Layout", (STORY_LAYOUTS.find((l) => l.id === storyLayout) || {}).name, "story_layout"]
+                    : ["Design", (FORM_DESIGNS.find((d) => d.id === design) || {}).name, "design"],
+                  ...(type === "story" ? [["Story", `“${storyHeadline}”${goalEnabled ? ` · Goal ${fmtMoney(Number(goalTarget) || 0)}` : ""}`, "story_content"]] : []),
+                  ["Gift types", Object.entries(gt).filter(([, v]) => v).map(([k]) => ({ one_time: "One-time", recurring: "Recurring", pledge: "Pledge payments", org_gift: "Org gifts" }[k])).join(", ") || "None selected", "gift_types"],
+                  ["Designations", (otherFund ? "“Other” fund allowed" : "No “Other” fund") + " · " + (splitEnabled ? "Split gifts allowed" : "Split gifts off"), "designations"],
+                  ["Donor fields", enabledFieldCount + " optional field" + (enabledFieldCount === 1 ? "" : "s") + " on · address " + fields.address, "donor_fields"],
+                  ["Custom fields", customFieldIds.length ? allCustomFields.filter((f) => customFieldIds.includes(f.id)).map((f) => f.name).join(", ") : "None added", "custom_fields"],
+                  ["Fee coverage", feeCoverDefault ? "Pre-checked by default" : "Opt-in (unchecked by default)", "fee"],
+                  ...(type !== "story" ? [["Distribution", { embed: "Embedded only", hosted: "Hosted page only", both: "Embedded + hosted page" }[dist] + (dist !== "embed" ? ` · give.riverbendhumane.org/${slug}` : ""), "distribution"]] : []),
+                ].map(([k, v, jumpKey]) => (
+                  <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #F0F2F5", fontSize: 13.5, gap: 12 }}>
+                    <span style={{ color: "#98A2B3", flexShrink: 0 }}>{k}</span>
+                    <span style={{ fontWeight: 600, textAlign: "right" }}>{v}</span>
+                    <button className="ge-btn ge-btn-ghost ge-btn-sm" style={{ flexShrink: 0 }} onClick={() => goToStep(jumpKey)}>Edit</button>
+                  </div>
+                ))}
+              </React.Fragment>
+            )}
+          </div>
+
+          <div className="ge-onb-foot">
+            <button className="ge-btn ge-btn-ghost" onClick={back} disabled={stepIndex === 0} style={{ opacity: stepIndex === 0 ? 0.4 : 1 }}>Back</button>
+            {stepKey === "review"
+              ? <button className="ge-btn ge-btn-primary" onClick={() => setPublished(true)}>Publish form</button>
+              : <button className="ge-btn ge-btn-primary" onClick={next} disabled={(stepKey === "type" && !type) || (stepKey === "design" && !design)}>Continue</button>}
           </div>
         </div>
 
         <div style={{ position: "sticky", top: 20 }}>
           <div className="ge-card ge-card-pad">
-            <h3 style={{ fontFamily: "Sora, sans-serif", fontSize: 14.5, margin: "0 0 12px" }}>Template</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              {TEMPLATE_ORDER.map((id) => (
-                <div key={id} onClick={() => setTemplate(id)}
-                  style={{ borderRadius: 8, padding: 8, border: "2px solid " + (template === id ? "#14213D" : "#E4E7EC"), cursor: "pointer" }}>
-                  <div style={{ height: 40, borderRadius: 5, background: ORGS[id].thumbGrad, marginBottom: 6 }} />
-                  <div style={{ fontSize: 11.5, fontWeight: 700 }}>{ORGS[id].tmplName}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="ge-card ge-card-pad" style={{ marginTop: 16 }}>
             <h3 style={{ fontFamily: "Sora, sans-serif", fontSize: 14.5, margin: "0 0 6px" }}>Live preview</h3>
-            <p style={{ fontSize: 12.5, color: "#98A2B3", margin: "0 0 12px" }}>This config, rendered in the selected template.</p>
-            <div style={{ border: "1px solid #E4E7EC", borderRadius: 10, overflow: "hidden", transform: "scale(0.86)", transformOrigin: "top left", width: "116%", height: 340 }}>
-              <div style={{ height: 340, overflow: "hidden" }}>
-                {React.createElement(TEMPLATE_COMPONENTS[template], { org: ORGS[template], key: template })}
-              </div>
-            </div>
+            <p style={{ fontSize: 12.5, color: "#98A2B3", margin: "0 0 12px" }}>
+              {templateId ? "This config, rendered in the closest matching template." : "Choose a form type to see a live preview."}
+            </p>
+            {templateId ? (
+              <React.Fragment>
+                <div style={{ border: "1px solid #E4E7EC", borderRadius: 10, overflow: "hidden", transform: "scale(0.86)", transformOrigin: "top left", width: "116%", height: 340 }}>
+                  <div style={{ height: 340, overflow: "hidden" }}>
+                    {accent
+                      ? React.createElement(TEMPLATE_COMPONENTS[templateId], { org: ORGS[templateId], key: templateId + design, accent })
+                      : React.createElement(TEMPLATE_COMPONENTS[templateId], { org: ORGS[templateId], key: templateId })}
+                  </div>
+                </div>
+                {type === "story" && <p style={{ fontSize: 11.5, color: "#98A2B3", margin: "10px 0 0" }}>Previewing the {(STORY_LAYOUTS.find((l) => l.id === storyLayout) || {}).name} layout.</p>}
+              </React.Fragment>
+            ) : (
+              <div style={{ height: 200, borderRadius: 10, border: "1.5px dashed #D0D5DD", display: "flex", alignItems: "center", justifyContent: "center", color: "#98A2B3", fontSize: 13 }}>No preview yet</div>
+            )}
           </div>
         </div>
       </div>
