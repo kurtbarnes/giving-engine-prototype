@@ -365,6 +365,84 @@ function DonorProfile({ donorId, onBack }) {
 }
 
 /* ============================================================
+   FORMS LIST
+   ============================================================ */
+function FormStatusPill({ status }) {
+  return <span className={"ge-pill " + (status === "active" ? "ge-pill-settled" : "ge-pill-refunded")}>{status === "active" ? "Active" : "Inactive"}</span>;
+}
+
+function FormsList({ onNew, onEdit }) {
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("all");
+
+  const filtered = useMemo(() => {
+    return MOCK_FORMS.filter((f) => {
+      if (status !== "all" && f.status !== status) return false;
+      if (q && !f.name.toLowerCase().includes(q.toLowerCase())) return false;
+      return true;
+    });
+  }, [q, status]);
+
+  const totals = useMemo(() => {
+    const totalRaised = MOCK_FORMS.reduce((a, f) => a + f.totalRaised, 0);
+    const activeCount = MOCK_FORMS.filter((f) => f.status === "active").length;
+    const avgConv = MOCK_FORMS.reduce((a, f) => a + f.conversionRate, 0) / MOCK_FORMS.length;
+    return { totalRaised, activeCount, avgConv };
+  }, []);
+
+  return (
+    <div>
+      <div className="ge-page-head">
+        <div className="ge-eyebrow">Admin Console</div>
+        <h1>Forms</h1>
+        <p>Every donation form configured for your organization, with performance at a glance. Every form shares the same checkout engine — only fields, template, and distribution differ.</p>
+      </div>
+
+      <div className="ge-stat-row">
+        <div className="ge-stat"><div className="ge-stat-label">Total forms</div><div className="ge-stat-value">{MOCK_FORMS.length}</div></div>
+        <div className="ge-stat"><div className="ge-stat-label">Active</div><div className="ge-stat-value">{totals.activeCount}</div></div>
+        <div className="ge-stat"><div className="ge-stat-label">Total raised</div><div className="ge-stat-value">{fmtMoney(totals.totalRaised)}</div></div>
+        <div className="ge-stat"><div className="ge-stat-label">Avg. conversion rate</div><div className="ge-stat-value">{totals.avgConv.toFixed(1)}%</div></div>
+      </div>
+
+      <div className="ge-card">
+        <div className="ge-card-pad" style={{ paddingBottom: 0 }}>
+          <div className="ge-toolbar">
+            <div className="ge-search"><input placeholder="Search forms…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+            <select className="ge-select" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <button className="ge-btn ge-btn-primary ge-btn-sm" onClick={onNew}>+ New form</button>
+          </div>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table className="ge-table">
+            <thead>
+              <tr><th>Form</th><th>Status</th><th>Total raised</th><th>Conversion rate</th><th>Created</th></tr>
+            </thead>
+            <tbody>
+              {filtered.map((f) => (
+                <tr key={f.id} onClick={() => onEdit(f)} style={{ cursor: "pointer" }}>
+                  <td><b>{f.name}</b><div style={{ fontSize: 12, color: "#98A2B3" }}>{ORGS[f.template].tmplName}</div></td>
+                  <td><FormStatusPill status={f.status} /></td>
+                  <td><b>{fmtMoney(f.totalRaised)}</b></td>
+                  <td>{f.conversionRate}%</td>
+                  <td>{f.createdDate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filtered.length === 0 && <div style={{ padding: 40, textAlign: "center", color: "#98A2B3" }}>No forms match these filters.</div>}
+        </div>
+        <div style={{ padding: "12px 20px", fontSize: 12.5, color: "#98A2B3" }}>Showing {filtered.length} of {MOCK_FORMS.length} forms</div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    FORM BUILDER
    ============================================================ */
 function Toggle({ on, onClick }) {
@@ -379,7 +457,7 @@ function FieldRow({ label, desc, children }) {
   );
 }
 
-function FormBuilder() {
+function FormBuilder({ formName = "Spring Appeal", onBack }) {
   const [gt, setGt] = useState({ one_time: true, recurring: true, pledge: true, org_gift: true });
   const [fields, setFields] = useState({ title: true, address: "optional", phone: false, anonymous: true, tribute: true, comments: true, consent: true, ackOptOut: true });
   const [otherFund, setOtherFund] = useState(true);
@@ -391,9 +469,10 @@ function FormBuilder() {
 
   return (
     <div>
+      {onBack && <button className="ge-btn ge-btn-ghost ge-btn-sm" style={{ marginBottom: 18 }} onClick={onBack}>&larr; All forms</button>}
       <div className="ge-page-head">
         <div className="ge-eyebrow">Admin Console</div>
-        <h1>Form builder — Spring Appeal</h1>
+        <h1>Form builder — {formName}</h1>
         <p>Configure gift types, fields, and distribution for this form. Every field below maps directly to the Form entity in the design document (§6, §9).</p>
       </div>
       <div className="ge-formbuilder-grid">
@@ -499,7 +578,7 @@ function Branding() {
   return (
     <div>
       <div className="ge-page-head">
-        <div className="ge-eyebrow">Admin Console</div>
+        <div className="ge-eyebrow">Settings</div>
         <h1>Brand kit</h1>
         <p>Set your organization's logo, colors, and font once — every form and template inherits it by default, closing idea RENXT-I-6264 (branding shouldn't be re-set per form).</p>
       </div>
@@ -549,8 +628,8 @@ function MerchantAccountSummary({ goOnboard }) {
   return (
     <div>
       <div className="ge-page-head">
-        <div className="ge-eyebrow">Admin Console</div>
-        <h1>Payment processing</h1>
+        <div className="ge-eyebrow">Settings</div>
+        <h1>Payments</h1>
         <p>Your organization's Rainforest sub-merchant account and payout details.</p>
       </div>
       <div className="ge-card ge-card-pad" style={{ maxWidth: 560 }}>
@@ -567,6 +646,436 @@ function MerchantAccountSummary({ goOnboard }) {
           </div>
         ))}
         <button className="ge-btn ge-btn-ghost ge-btn-sm" style={{ marginTop: 16 }} onClick={goOnboard}>View onboarding flow</button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   SECURITY
+   ============================================================ */
+function SecuritySettings() {
+  const [require2fa, setRequire2fa] = useState(true);
+  const [sessionTimeout, setSessionTimeout] = useState("30");
+  const [ipAllowlist, setIpAllowlist] = useState(true);
+  const auditLog = [
+    { id: 1, event: "Signed in", user: "kurt@riverbendhumane.org", ip: "73.14.201.9", time: "2026-08-14 09:12" },
+    { id: 2, event: "API key regenerated", user: "admin@riverbendhumane.org", ip: "73.14.201.9", time: "2026-08-12 15:44" },
+    { id: 3, event: "Form published: Spring Appeal", user: "kurt@riverbendhumane.org", ip: "73.14.201.9", time: "2026-08-10 11:03" },
+    { id: 4, event: "Signed in", user: "admin@riverbendhumane.org", ip: "204.15.66.2", time: "2026-08-08 08:27" },
+    { id: 5, event: "Payout bank account updated", user: "kurt@riverbendhumane.org", ip: "73.14.201.9", time: "2026-08-01 14:52" },
+  ];
+
+  return (
+    <div>
+      <div className="ge-page-head">
+        <div className="ge-eyebrow">Settings</div>
+        <h1>Security</h1>
+        <p>Access controls and activity for your Giving Engine admin console.</p>
+      </div>
+      <div className="ge-formbuilder-grid">
+        <div>
+          <div className="ge-card ge-card-pad ge-field-group">
+            <h3>Access controls</h3>
+            <FieldRow label="Require two-factor authentication" desc="Applies to every admin user on this account"><Toggle on={require2fa} onClick={() => setRequire2fa((v) => !v)} /></FieldRow>
+            <FieldRow label="Restrict admin console to allowed IPs" desc="Only requests from the list below may sign in"><Toggle on={ipAllowlist} onClick={() => setIpAllowlist((v) => !v)} /></FieldRow>
+            <FieldRow label="Session timeout">
+              <select className="ge-select" value={sessionTimeout} onChange={(e) => setSessionTimeout(e.target.value)}>
+                <option value="15">15 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">1 hour</option>
+                <option value="480">8 hours</option>
+              </select>
+            </FieldRow>
+          </div>
+
+          {ipAllowlist && (
+            <div className="ge-card ge-card-pad ge-field-group">
+              <h3>Allowed IP addresses</h3>
+              {["73.14.201.9/32", "204.15.66.0/24"].map((ip) => (
+                <div key={ip} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid #F0F2F5" }}>
+                  <span className="ge-mono">{ip}</span>
+                  <button className="ge-btn ge-btn-ghost ge-btn-sm">Remove</button>
+                </div>
+              ))}
+              <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                <input className="ge-input" placeholder="e.g. 198.51.100.4/32" />
+                <button className="ge-btn ge-btn-ghost ge-btn-sm">Add</button>
+              </div>
+            </div>
+          )}
+
+          <div className="ge-card ge-card-pad ge-field-group">
+            <h3>Recent activity</h3>
+            <div style={{ overflowX: "auto" }}>
+              <table className="ge-table">
+                <thead><tr><th>Event</th><th>User</th><th>IP address</th><th>Time</th></tr></thead>
+                <tbody>
+                  {auditLog.map((a) => (
+                    <tr key={a.id}><td>{a.event}</td><td>{a.user}</td><td className="ge-mono">{a.ip}</td><td>{a.time}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ position: "sticky", top: 20 }}>
+          <div className="ge-card ge-card-pad">
+            <h3 style={{ fontFamily: "Sora, sans-serif", fontSize: 14.5, margin: "0 0 10px" }}>Payment data handling</h3>
+            <p style={{ fontSize: 12.5, color: "#667085", lineHeight: 1.6, margin: 0 }}>
+              Card and bank details are tokenized directly by Rainforest and never touch Giving Engine servers. Your account qualifies for PCI SAQ A, the lightest self-assessment tier.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   FUNDRAISING
+   ============================================================ */
+function FundraisingSettings() {
+  const [tab, setTab] = useState("funds");
+  const [importing, setImporting] = useState(false);
+  const [funds, setFunds] = useState(MOCK_FUNDS);
+  const [campaigns, setCampaigns] = useState(MOCK_CAMPAIGNS);
+  const [appeals, setAppeals] = useState(MOCK_APPEALS);
+
+  function importFromRE() {
+    setImporting(true);
+    setTimeout(() => {
+      setImporting(false);
+      if (tab === "funds") setFunds((f) => [...f, { id: "imp" + Date.now(), name: "Wildlife Rescue Fund", code: "WLD-009", active: true }]);
+      if (tab === "campaigns") setCampaigns((c) => [...c, { id: "imp" + Date.now(), name: "Emergency Response Fund", code: "CAM-EMR-01", active: true, goal: 40000 }]);
+      if (tab === "appeals") setAppeals((a) => [...a, { id: "imp" + Date.now(), name: "Email Appeal — June", code: "APL-2026-JUN", active: true }]);
+    }, 1100);
+  }
+
+  const rows = tab === "funds" ? funds : tab === "campaigns" ? campaigns : appeals;
+  function toggleActive(id) {
+    const setter = tab === "funds" ? setFunds : tab === "campaigns" ? setCampaigns : setAppeals;
+    setter((list) => list.map((r) => r.id === id ? { ...r, active: !r.active } : r));
+  }
+
+  return (
+    <div>
+      <div className="ge-page-head">
+        <div className="ge-eyebrow">Settings</div>
+        <h1>Fundraising</h1>
+        <p>Funds, campaigns, and appeals available across every donation form. Pull these directly from Raiser's Edge NXT to keep them in sync.</p>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div className="ge-radiogroup">
+          {[["funds", "Funds & designations"], ["campaigns", "Campaigns"], ["appeals", "Appeals"]].map(([v, l]) => (
+            <button key={v} className={tab === v ? "on" : ""} onClick={() => setTab(v)}>{l}</button>
+          ))}
+        </div>
+        <button className="ge-btn ge-btn-ghost ge-btn-sm" onClick={importFromRE} disabled={importing}>
+          {importing ? "Importing…" : "⟳ Pull from Raiser's Edge NXT"}
+        </button>
+      </div>
+
+      <div className="ge-card">
+        <div style={{ overflowX: "auto" }}>
+          <table className="ge-table">
+            <thead>
+              <tr>
+                <th>Name</th><th>RE NXT code</th>{tab === "campaigns" && <th>Goal</th>}<th>Status</th><th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td><b>{r.name}</b></td>
+                  <td className="ge-mono">{r.code}</td>
+                  {tab === "campaigns" && <td>{fmtMoney(r.goal)}</td>}
+                  <td><span className={"ge-pill " + (r.active ? "ge-pill-settled" : "ge-pill-refunded")}>{r.active ? "Active" : "Inactive"}</span></td>
+                  <td style={{ textAlign: "right" }}><button className="ge-btn ge-btn-ghost ge-btn-sm" onClick={() => toggleActive(r.id)}>{r.active ? "Deactivate" : "Activate"}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ padding: "12px 20px", fontSize: 12.5, color: "#98A2B3" }}>{rows.length} {tab === "funds" ? "funds" : tab}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   GENERAL
+   ============================================================ */
+function CustomFieldsCard() {
+  const [tab, setTab] = useState("donor");
+  const [donorFields, setDonorFields] = useState(MOCK_DONOR_FIELDS);
+  const [giftFields, setGiftFields] = useState(MOCK_GIFT_FIELDS);
+  const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState("Text");
+
+  const fields = tab === "donor" ? donorFields : giftFields;
+  const setFields = tab === "donor" ? setDonorFields : setGiftFields;
+
+  function toggle(id, key) {
+    setFields((list) => list.map((f) => f.id === id ? { ...f, [key]: !f[key] } : f));
+  }
+  function addField() {
+    if (!newName.trim()) return;
+    setFields((list) => [...list, { id: tab + Date.now(), name: newName, type: newType, syncRE: false, onForms: false }]);
+    setNewName("");
+  }
+
+  return (
+    <div className="ge-card ge-card-pad ge-field-group">
+      <h3>Custom fields</h3>
+      <div className="ge-radiogroup" style={{ marginBottom: 14 }}>
+        {[["donor", "Donor fields"], ["gift", "Gift fields"]].map(([v, l]) => (
+          <button key={v} className={tab === v ? "on" : ""} onClick={() => setTab(v)}>{l}</button>
+        ))}
+      </div>
+      {fields.map((f) => (
+        <div key={f.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #F0F2F5", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{f.name}</div>
+            <div style={{ fontSize: 12, color: "#98A2B3" }}>{f.type}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#667085" }}>Sync to RE NXT<Toggle on={f.syncRE} onClick={() => toggle(f.id, "syncRE")} /></label>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#667085" }}>On forms<Toggle on={f.onForms} onClick={() => toggle(f.id, "onForms")} /></label>
+          </div>
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        <input className="ge-input" placeholder="New field name" value={newName} onChange={(e) => setNewName(e.target.value)} />
+        <select className="ge-select" value={newType} onChange={(e) => setNewType(e.target.value)}>
+          {["Text", "Number", "Date", "Dropdown", "Checkbox"].map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <button className="ge-btn ge-btn-ghost ge-btn-sm" onClick={addField}>+ Add field</button>
+      </div>
+    </div>
+  );
+}
+
+function DomainsCard() {
+  const [domains] = useState([
+    { id: 1, domain: "give.riverbendhumane.org", status: "verified", primary: true },
+    { id: 2, domain: "donate.riverbendhumane.org", status: "pending", primary: false },
+  ]);
+  const dns = [
+    { type: "TXT", host: "give.riverbendhumane.org", value: "v=spf1 include:_spf.givingengine.com ~all", status: "verified" },
+    { type: "CNAME", host: "em.give.riverbendhumane.org", value: "mail.givingengine.com", status: "verified" },
+    { type: "TXT", host: "_dmarc.riverbendhumane.org", value: "v=DMARC1; p=quarantine;", status: "pending" },
+  ];
+  return (
+    <div className="ge-card ge-card-pad ge-field-group">
+      <h3>Linked domains</h3>
+      {domains.map((d) => (
+        <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid #F0F2F5" }}>
+          <div>
+            <span className="ge-mono">{d.domain}</span>{d.primary && <span className="ge-tag" style={{ marginLeft: 8 }}>Primary</span>}
+          </div>
+          <span className={"ge-pill " + (d.status === "verified" ? "ge-pill-settled" : "ge-pill-pending")}>{d.status === "verified" ? "Verified" : "Pending"}</span>
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 20 }}>
+        <input className="ge-input" placeholder="e.g. donate.yourorg.org" />
+        <button className="ge-btn ge-btn-ghost ge-btn-sm">Add domain</button>
+      </div>
+
+      <h3>Email DNS records</h3>
+      <div style={{ overflowX: "auto" }}>
+        <table className="ge-table">
+          <thead><tr><th>Type</th><th>Host</th><th>Value</th><th>Status</th></tr></thead>
+          <tbody>
+            {dns.map((r, i) => (
+              <tr key={i}>
+                <td>{r.type}</td>
+                <td className="ge-mono">{r.host}</td>
+                <td className="ge-mono" style={{ maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.value}</td>
+                <td><span className={"ge-pill " + (r.status === "verified" ? "ge-pill-settled" : "ge-pill-pending")}>{r.status === "verified" ? "Verified" : "Pending"}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function GeneralPreferencesCard() {
+  const [currency, setCurrency] = useState("USD");
+  const [language, setLanguage] = useState("en-US");
+  const [dateFormat, setDateFormat] = useState("MM/DD/YYYY");
+  return (
+    <div className="ge-card ge-card-pad ge-field-group">
+      <h3>Basic settings</h3>
+      <FieldRow label="Currency">
+        <select className="ge-select" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+          {["USD", "CAD", "GBP", "EUR", "AUD"].map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </FieldRow>
+      <FieldRow label="Language">
+        <select className="ge-select" value={language} onChange={(e) => setLanguage(e.target.value)}>
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+          <option value="es">Spanish</option>
+          <option value="fr">French</option>
+        </select>
+      </FieldRow>
+      <FieldRow label="Date format">
+        <select className="ge-select" value={dateFormat} onChange={(e) => setDateFormat(e.target.value)}>
+          <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+          <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+          <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+        </select>
+      </FieldRow>
+    </div>
+  );
+}
+
+function GeneralSettings() {
+  return (
+    <div>
+      <div className="ge-page-head">
+        <div className="ge-eyebrow">Settings</div>
+        <h1>General</h1>
+        <p>Custom fields, linked domains, and basic account preferences.</p>
+      </div>
+      <div className="ge-formbuilder-grid">
+        <div>
+          <CustomFieldsCard />
+          <DomainsCard />
+        </div>
+        <div style={{ position: "sticky", top: 20 }}>
+          <GeneralPreferencesCard />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   INTEGRATIONS
+   ============================================================ */
+function IntegrationsSettings() {
+  const [connected, setConnected] = useState(true);
+  const [env, setEnv] = useState("sandbox");
+  const [clientId, setClientId] = useState("ge-client-8827kj");
+  const [clientSecret, setClientSecret] = useState("sk_live_9f2a7c1e4b6d8f30");
+  const [showSecret, setShowSecret] = useState(false);
+  const [orgId, setOrgId] = useState("00d5f000-riverbend");
+  const [syncMode, setSyncMode] = useState("batch");
+  const [batchTemplate, setBatchTemplate] = useState("GE-{form_name}-{date}");
+  const [batchFreq, setBatchFreq] = useState("daily");
+  const [batchGroup, setBatchGroup] = useState("form");
+
+  const batchPreview = batchTemplate
+    .replace("{form_name}", "Spring-Appeal")
+    .replace("{date}", new Date().toISOString().slice(0, 10))
+    .replace("{fund}", "General");
+
+  return (
+    <div>
+      <div className="ge-page-head">
+        <div className="ge-eyebrow">Settings</div>
+        <h1>Integrations</h1>
+        <p>Connect Giving Engine to Raiser's Edge NXT to sync gifts and constituents automatically.</p>
+      </div>
+
+      <div className="ge-formbuilder-grid">
+        <div>
+          <div className="ge-card ge-card-pad ge-field-group">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ margin: 0 }}>Raiser's Edge NXT</h3>
+              <span className={"ge-pill " + (connected ? "ge-pill-settled" : "ge-pill-refunded")}>{connected ? "Connected" : "Not connected"}</span>
+            </div>
+            <FieldRow label="Environment">
+              <div className="ge-radiogroup">
+                {[["sandbox", "Sandbox"], ["production", "Production"]].map(([v, l]) => (
+                  <button key={v} className={env === v ? "on" : ""} onClick={() => setEnv(v)}>{l}</button>
+                ))}
+              </div>
+            </FieldRow>
+            <div style={{ marginTop: 14 }}>
+              <label className="ge-label">Organization ID</label>
+              <input className="ge-input" value={orgId} onChange={(e) => setOrgId(e.target.value)} />
+            </div>
+            <div style={{ marginTop: 14 }}>
+              <label className="ge-label">Client ID</label>
+              <input className="ge-input" value={clientId} onChange={(e) => setClientId(e.target.value)} />
+            </div>
+            <div style={{ marginTop: 14 }}>
+              <label className="ge-label">Client secret</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input className="ge-input" type={showSecret ? "text" : "password"} value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} />
+                <button className="ge-btn ge-btn-ghost ge-btn-sm" onClick={() => setShowSecret((v) => !v)}>{showSecret ? "Hide" : "Show"}</button>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+              <button className="ge-btn ge-btn-primary ge-btn-sm" onClick={() => setConnected(true)}>{connected ? "Reconnect" : "Connect"}</button>
+              {connected && <button className="ge-btn ge-btn-ghost ge-btn-sm" onClick={() => setConnected(false)}>Disconnect</button>}
+            </div>
+          </div>
+
+          <div className="ge-card ge-card-pad ge-field-group">
+            <h3>Gift sync mode</h3>
+            <FieldRow label="How gifts are written to RE NXT">
+              <div className="ge-radiogroup">
+                {[["direct", "Direct insert"], ["batch", "Batch insert"]].map(([v, l]) => (
+                  <button key={v} className={syncMode === v ? "on" : ""} onClick={() => setSyncMode(v)}>{l}</button>
+                ))}
+              </div>
+            </FieldRow>
+            <p style={{ fontSize: 12.5, color: "#98A2B3", margin: "4px 0 0" }}>
+              {syncMode === "direct"
+                ? "Each settled gift is written to RE NXT immediately as its own transaction."
+                : "Settled gifts are grouped into RE NXT batches on the schedule below, then committed together."}
+            </p>
+
+            {syncMode === "batch" && (
+              <div style={{ marginTop: 18, paddingTop: 18, borderTop: "1px solid #F0F2F5" }}>
+                <div style={{ marginBottom: 14 }}>
+                  <label className="ge-label">Batch name template</label>
+                  <input className="ge-input" value={batchTemplate} onChange={(e) => setBatchTemplate(e.target.value)} />
+                  <div style={{ fontSize: 12, color: "#98A2B3", marginTop: 6 }}>Available tokens: <span className="ge-mono">{"{form_name}"}</span>, <span className="ge-mono">{"{date}"}</span>, <span className="ge-mono">{"{fund}"}</span></div>
+                </div>
+                <FieldRow label="Create a new batch">
+                  <select className="ge-select" value={batchFreq} onChange={(e) => setBatchFreq(e.target.value)}>
+                    <option value="realtime">Continuously (near real-time)</option>
+                    <option value="hourly">Every hour</option>
+                    <option value="daily">Once a day</option>
+                    <option value="manual">Manually only</option>
+                  </select>
+                </FieldRow>
+                <FieldRow label="Group gifts into batches by" desc="Determines how many separate batches are created per run">
+                  <select className="ge-select" value={batchGroup} onChange={(e) => setBatchGroup(e.target.value)}>
+                    <option value="single">Single batch</option>
+                    <option value="form">Form</option>
+                    <option value="fund">Fund / designation</option>
+                    <option value="day">Gift date</option>
+                  </select>
+                </FieldRow>
+                <div style={{ background: "#F5F6F8", borderRadius: 8, padding: "10px 14px", fontSize: 12.5, color: "#475467", marginTop: 6 }}>
+                  Next batch name preview: <span className="ge-mono" style={{ fontWeight: 700 }}>{batchPreview}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ position: "sticky", top: 20 }}>
+          <div className="ge-card ge-card-pad">
+            <h3 style={{ fontFamily: "Sora, sans-serif", fontSize: 14.5, margin: "0 0 10px" }}>Last sync</h3>
+            {[["Status", "Success"], ["Gifts synced", "212 of 214"], ["Last run", "2026-08-14 06:00"], ["Next run", batchFreq === "manual" ? "Manual only" : "2026-08-15 06:00"]].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid #F0F2F5", fontSize: 13.5 }}>
+                <span style={{ color: "#98A2B3" }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span>
+              </div>
+            ))}
+            <button className="ge-btn ge-btn-ghost ge-btn-sm" style={{ marginTop: 14, width: "100%", justifyContent: "center" }}>Run sync now</button>
+          </div>
+        </div>
       </div>
     </div>
   );

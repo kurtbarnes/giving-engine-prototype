@@ -186,6 +186,53 @@ function buildDonors() {
 }
 const MOCK_DONORS = buildDonors();
 
+/* ---- forms list mock data ---- */
+const FORM_NAMES = ["Spring Appeal", "Year-End Giving", "Annual Fund Drive", "Monthly Giving Circle", "Gala Ticket & Gift", "Capital Campaign", "Memorial Tribute Fund", "Disaster Relief Fund"];
+const MOCK_FORMS = FORM_NAMES.map((name, i) => {
+  const template = TEMPLATE_ORDER[i % TEMPLATE_ORDER.length];
+  const active = rand() > 0.25;
+  return {
+    id: "FRM-" + (900 + i),
+    name,
+    template,
+    status: active ? "active" : "inactive",
+    totalRaised: Math.round((2000 + rand() * 48000) / 50) * 50,
+    conversionRate: Math.round((22 + rand() * 40) * 10) / 10,
+    createdDate: futureDate(-330, -30),
+  };
+});
+
+/* ---- fundraising settings mock data ---- */
+const MOCK_FUNDS = [
+  { id: "where", name: "Where Needed Most", code: "GEN-001", active: true },
+  { id: "shelter", name: "Shelter Medical Fund", code: "SHL-014", active: true },
+  { id: "foster", name: "Foster Program", code: "FOS-007", active: true },
+  { id: "spay", name: "Spay & Neuter Fund", code: "SPN-002", active: true },
+  { id: "endowment", name: "Endowment", code: "END-001", active: false },
+];
+const MOCK_CAMPAIGNS = [
+  { id: "annual26", name: "2026 Annual Fund", code: "CAM-2026-01", active: true, goal: 150000 },
+  { id: "capital", name: "New Shelter Capital Campaign", code: "CAM-CAP-01", active: true, goal: 2000000 },
+  { id: "yearend25", name: "Year-End 2025", code: "CAM-2025-YE", active: false, goal: 80000 },
+];
+const MOCK_APPEALS = [
+  { id: "spring26", name: "Spring Appeal 2026", code: "APL-2026-SPR", active: true },
+  { id: "gala26", name: "Gala Invitation", code: "APL-2026-GALA", active: true },
+  { id: "mail25", name: "Fall Direct Mail 2025", code: "APL-2025-FALL", active: false },
+];
+
+/* ---- general settings mock data ---- */
+const MOCK_DONOR_FIELDS = [
+  { id: "df1", name: "Preferred name", type: "Text", syncRE: true, onForms: false },
+  { id: "df2", name: "Employer", type: "Text", syncRE: true, onForms: true },
+  { id: "df3", name: "Volunteer interest", type: "Dropdown", syncRE: false, onForms: true },
+];
+const MOCK_GIFT_FIELDS = [
+  { id: "gf1", name: "In honor of relationship", type: "Text", syncRE: true, onForms: true },
+  { id: "gf2", name: "Matching gift company", type: "Text", syncRE: true, onForms: false },
+  { id: "gf3", name: "Solicitor", type: "Dropdown", syncRE: false, onForms: false },
+];
+
 /* ============================================================
    SHARED CHECKOUT STATE HOOK
    ============================================================ */

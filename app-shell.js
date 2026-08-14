@@ -73,11 +73,13 @@ function CheckoutView({ templateId, onBack }) {
 
 function AdminConsole() {
   const [page, setPage] = useState("gifts");
+  const [editingForm, setEditingForm] = useState(null);
   const items = [
     { section: "Overview", items: [["gifts", "Gift history"], ["donors", "Donors"]] },
-    { section: "Forms", items: [["builder", "Form builder"], ["branding", "Branding"]] },
-    { section: "Payments", items: [["merchant", "Payment processing"]] },
+    { section: "Forms", items: [["forms", "Forms"]] },
+    { section: "Settings", items: [["branding", "Branding"], ["payments", "Payments"], ["security", "Security"], ["fundraising", "Fundraising"], ["general", "General"], ["integrations", "Integrations"]] },
   ];
+  function goPage(id) { setPage(id); if (id !== "__builder") setEditingForm(null); }
   return (
     <div className="ge-admin-shell">
       <div className="ge-admin-side">
@@ -85,7 +87,7 @@ function AdminConsole() {
           <div key={sec.section}>
             <div className="ge-admin-side-label">{sec.section}</div>
             {sec.items.map(([id, label]) => (
-              <button key={id} className={"ge-admin-side-item" + (page === id ? " active" : "")} onClick={() => setPage(id)}>{label}</button>
+              <button key={id} className={"ge-admin-side-item" + (page === id ? " active" : "")} onClick={() => goPage(id)}>{label}</button>
             ))}
           </div>
         ))}
@@ -93,9 +95,19 @@ function AdminConsole() {
       <div className="ge-admin-content">
         {page === "gifts" && <GiftHistory />}
         {page === "donors" && <DonorDirectory />}
-        {page === "builder" && <FormBuilder />}
+        {page === "forms" && (
+          <FormsList
+            onNew={() => { setEditingForm(null); setPage("__builder"); }}
+            onEdit={(f) => { setEditingForm(f); setPage("__builder"); }}
+          />
+        )}
+        {page === "__builder" && <FormBuilder formName={editingForm ? editingForm.name : "Untitled form"} onBack={() => setPage("forms")} />}
         {page === "branding" && <Branding />}
-        {page === "merchant" && <MerchantAccountSummary goOnboard={() => setPage("__onb")} />}
+        {page === "payments" && <MerchantAccountSummary goOnboard={() => setPage("__onb")} />}
+        {page === "security" && <SecuritySettings />}
+        {page === "fundraising" && <FundraisingSettings />}
+        {page === "general" && <GeneralSettings />}
+        {page === "integrations" && <IntegrationsSettings />}
         {page === "__onb" && <OnboardingWizard />}
       </div>
     </div>
